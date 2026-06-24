@@ -1,13 +1,4 @@
-.env
 .DS_Store
-.well-known
-
-/vendor/
-/node_modules/
-/*.log
-/.idea/*
-/.vscode/
-
-/wp-content/uploads/
-/wp-content/cache/
-/wp-content/advanced-cache.php
+.idea/
+.vscode/
+*.log
