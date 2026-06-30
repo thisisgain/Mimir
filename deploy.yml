@@ -1,0 +1,63 @@
+name: Deploy to WP Engine
+
+on:
+    push:
+        branches:
+            - develop
+            - uat
+            - master
+            - main
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        environment: ${{ (github.ref_name == 'master' || github.ref_name == 'main') && 'production' || github.ref_name }}
+
+        env:
+            THEME_DIR: ${{ vars.THEME_DIR }}
+            WPE_ENV: ${{ vars.WPE_ENV }}
+            NODE_VERSION: ${{ vars.NODE_VERSION }}
+            PHP_VERSION: ${{ vars.PHP_VERSION }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            # -------- Frontend (Yarn) in theme folder --------
+            - name: Use Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: 'yarn'
+                  cache-dependency-path: ${{ env.THEME_DIR }}/yarn.lock
+
+            - name: Install frontend deps (theme)
+              working-directory: ${{ env.THEME_DIR }}
+              run: yarn install --frozen-lockfile
+
+            - name: Build frontend (theme)
+              working-directory: ${{ env.THEME_DIR }}
+              run: yarn build:prod
+
+            - name: Remove frontend deps before deploy
+              working-directory: ${{ env.THEME_DIR }}
+              run: rm -rf node_modules
+
+            # -------- Backend (Composer) in repo root --------
+            - name: Setup PHP with Composer
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: ${{ env.PHP_VERSION }}
+                  tools: composer:v2
+                  coverage: none
+                  extensions: zip
+            - name: Install Composer deps (no dev, optimized)
+              working-directory: ${{ env.THEME_DIR }}
+              run: composer install --no-dev -o --no-scripts
+
+            # -------- Deploy full repo to WP Engine --------
+            - name: Deploy to WP Engine
+              uses: wpengine/github-action-wpe-site-deploy@v3
+              with:
+                  WPE_SSHG_KEY_PRIVATE: ${{ secrets.WPE_SSHG_KEY_PRIVATE }}
+                  WPE_ENV: ${{ env.WPE_ENV }}

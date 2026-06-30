@@ -99,7 +99,7 @@ The following are planned additions. Each has a placeholder stub in `setup.sh` m
 
 - [ ] **Settings configuration** — `setup_config()` is a stub. Implement optional WordPress settings (permalink structure, timezone, default post/comment settings, etc.) using `wp option update`.
 
-- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `npm install` (and an optional initial build run) in both the parent and child theme directories.
+- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `yarn install` (and an optional initial build run) in both the parent and child theme directories.
 
 ---
 
