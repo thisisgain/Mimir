@@ -30,15 +30,27 @@ curl -fsSL https://raw.githubusercontent.com/thisisgain/Mimir/main/install.sh | 
 
 This downloads `setup.sh` to `/usr/local/bin/mimir` and prompts for your password (sudo required to write there). You only need to do this once per machine.
 
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thisisgain/Mimir/main/install.sh | bash -s -- --version=4.0.0
+```
+
 ### Updating
 
-To pull in the latest changes to Mimir:
+To pull in the latest release:
 
 ```bash
 mimir update-cli
 ```
 
-This re-downloads `setup.sh` from GitHub and reinstalls it — equivalent to running the curl command above again.
+To update to a specific version:
+
+```bash
+mimir update-cli --version=4.1.0
+```
+
+Both commands fetch `setup.sh` from the corresponding [GitHub release tag](https://github.com/thisisgain/Mimir/releases) and reinstall it to `/usr/local/bin/mimir`.
 
 ---
 
@@ -49,6 +61,12 @@ From an **empty directory** that will become your project root:
 ```bash
 mkdir my-project && cd my-project
 mimir
+```
+
+To check the currently installed version:
+
+```bash
+mimir version
 ```
 
 ### Local development (without global install)

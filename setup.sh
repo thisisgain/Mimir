@@ -12,6 +12,9 @@ trap 'echo -e "\n  \033[0;31m\033[1m✗ Setup failed on line ${LINENO}. See outp
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
+readonly MIMIR_VERSION="4.1.0"
+readonly MIMIR_REPO="thisisgain/Mimir"
+
 readonly EREBUS_REPO="git@github.com:thisisgain/Erebus.git"
 readonly EREBUS_THEME_DIR="wp-content/themes/erebus"
 readonly DEFAULT_ADMIN_EMAIL="harry.finn@thisisgain.com"
@@ -484,27 +487,73 @@ print_summary() {
   echo ""
 }
 
+# ─── Version helpers ─────────────────────────────────────────────────────────
+
+# Normalise a version string to vX.Y.Z — strips a leading 'v' then re-adds it.
+normalise_version() {
+  local v="${1#v}"
+  echo "v${v}"
+}
+
+# Fetch the latest release tag from GitHub.
+latest_release_tag() {
+  local tag
+  tag=$(curl -fsSL "https://api.github.com/repos/${MIMIR_REPO}/releases/latest" \
+    | grep '"tag_name"' \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/') \
+    || error "Could not reach GitHub — check your internet connection."
+  [[ -z "$tag" ]] && error "Could not determine the latest Mimir release."
+  echo "$tag"
+}
+
 # ─── Update CLI ──────────────────────────────────────────────────────────────
 
 update_cli() {
   local install_path="/usr/local/bin/mimir"
-  local script_url="https://raw.githubusercontent.com/thisisgain/Mimir/main/setup.sh"
+  local version_input=""
+
+  # Parse --version=X.Y.Z or --version X.Y.Z
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --version=*) version_input="${1#--version=}"; shift ;;
+      --version)   version_input="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
 
   echo ""
   echo -e "${BLUE}${BOLD}  Updating Mimir CLI...${RESET}" >&2
   echo ""
 
+  local version_tag
+  if [[ -n "$version_input" ]]; then
+    version_tag=$(normalise_version "$version_input")
+    info "Installing Mimir ${version_tag}..."
+  else
+    info "Fetching latest Mimir release..."
+    version_tag=$(latest_release_tag)
+    info "Latest release: ${version_tag}"
+  fi
+
+  local script_url="https://raw.githubusercontent.com/${MIMIR_REPO}/${version_tag}/setup.sh"
   local tmp
   tmp=$(mktemp)
-  info "Downloading latest setup script..."
+  info "Downloading ${script_url}..."
   curl -fsSL "$script_url" -o "$tmp" \
-    || error "Failed to download from ${script_url}"
+    || error "Failed to download Mimir ${version_tag}. Check the version exists: https://github.com/${MIMIR_REPO}/releases"
   chmod +x "$tmp"
   info "Installing to ${install_path} (may prompt for your password)..."
   sudo mv "$tmp" "$install_path"
   sudo chmod +x "$install_path"
-  success "Mimir updated successfully"
+  success "Mimir updated to ${version_tag}"
   echo ""
+  exit 0
+}
+
+# ─── Version ─────────────────────────────────────────────────────────────────
+
+cmd_version() {
+  echo "  Mimir v${MIMIR_VERSION}"
   exit 0
 }
 
@@ -513,12 +562,14 @@ update_cli() {
 usage() {
   cat << USAGE
 
-  Mimir v4 — GAIN WordPress Project Setup
+  Mimir v${MIMIR_VERSION} — GAIN WordPress Project Setup
 
   Usage:
-    mimir                 Run the interactive setup wizard
-    mimir update-cli      Update mimir to the latest version
-    mimir --help          Show this help text
+    mimir                              Run the interactive setup wizard
+    mimir version                      Print the installed Mimir version
+    mimir update-cli                   Update to the latest release
+    mimir update-cli --version=4.1.0   Update to a specific version
+    mimir --help                       Show this help text
 
   Prerequisites:
     - WP-CLI  (https://wp-cli.org)
@@ -537,7 +588,8 @@ USAGE
 main() {
   case "${1:-}" in
     --help|-h)   usage ;;
-    update-cli)  update_cli ;;
+    version)     cmd_version ;;
+    update-cli)  update_cli "${@:2}" ;;
   esac
 
   banner
