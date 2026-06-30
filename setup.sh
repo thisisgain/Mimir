@@ -339,7 +339,33 @@ PHP
   fi
 }
 
-# ─── Step 4: Plugins (placeholder) ───────────────────────────────────────────
+# ─── Step 4: GitHub Actions deploy workflow ──────────────────────────────────
+
+setup_deploy() {
+  step "GitHub Actions deploy workflow"
+
+  local workflows_dir=".github/workflows"
+  local deploy_dest="${workflows_dir}/deploy.yml"
+  local deploy_src="https://raw.githubusercontent.com/thisisgain/Mimir/main/deploy.yml"
+
+  if [[ -f "$deploy_dest" ]]; then
+    success "Deploy workflow already exists, skipping"
+    return
+  fi
+
+  mkdir -p "$workflows_dir"
+  curl -fsSL "$deploy_src" -o "$deploy_dest" \
+    || error "Failed to download deploy workflow from ${deploy_src}"
+
+  success "Deploy workflow written to ${deploy_dest}"
+  info "Configure the following in your GitHub repo settings before pushing:"
+  echo "" >&2
+  echo -e "    ${BOLD}Variables:${RESET}  THEME_DIR, WPE_ENV, NODE_VERSION, PHP_VERSION" >&2
+  echo -e "    ${BOLD}Secret:${RESET}     WPE_SSHG_KEY_PRIVATE" >&2
+  echo "" >&2
+}
+
+# ─── Step 5: Plugins (placeholder) ───────────────────────────────────────────
 
 setup_plugins() {
   # TODO: Install default plugin set.
@@ -349,7 +375,7 @@ setup_plugins() {
   :
 }
 
-# ─── Step 5: Optional config (placeholder) ───────────────────────────────────
+# ─── Step 6: Optional config (placeholder) ───────────────────────────────────
 
 setup_config() {
   # TODO: Apply optional WordPress settings (permalink structure, timezone,
@@ -358,7 +384,7 @@ setup_config() {
   :
 }
 
-# ─── Step 6: Build dependencies (placeholder) ────────────────────────────────
+# ─── Step 7: Build dependencies (placeholder) ────────────────────────────────
 
 setup_build() {
   # TODO: Install front-end build dependencies once build tooling in Erebus
@@ -367,7 +393,7 @@ setup_build() {
   :
 }
 
-# ─── Step 7: Git initialisation ──────────────────────────────────────────────
+# ─── Step 8: Git initialisation ──────────────────────────────────────────────
 
 setup_git() {
   step "Git repository setup"
@@ -458,6 +484,30 @@ print_summary() {
   echo ""
 }
 
+# ─── Update CLI ──────────────────────────────────────────────────────────────
+
+update_cli() {
+  local install_path="/usr/local/bin/mimir"
+  local script_url="https://raw.githubusercontent.com/thisisgain/Mimir/main/setup.sh"
+
+  echo ""
+  echo -e "${BLUE}${BOLD}  Updating Mimir CLI...${RESET}" >&2
+  echo ""
+
+  local tmp
+  tmp=$(mktemp)
+  info "Downloading latest setup script..."
+  curl -fsSL "$script_url" -o "$tmp" \
+    || error "Failed to download from ${script_url}"
+  chmod +x "$tmp"
+  info "Installing to ${install_path} (may prompt for your password)..."
+  sudo mv "$tmp" "$install_path"
+  sudo chmod +x "$install_path"
+  success "Mimir updated successfully"
+  echo ""
+  exit 0
+}
+
 # ─── Usage ───────────────────────────────────────────────────────────────────
 
 usage() {
@@ -466,8 +516,9 @@ usage() {
   Mimir v4 — GAIN WordPress Project Setup
 
   Usage:
-    ./setup.sh          Run the interactive setup wizard
-    ./setup.sh --help   Show this help text
+    mimir                 Run the interactive setup wizard
+    mimir update-cli      Update mimir to the latest version
+    mimir --help          Show this help text
 
   Prerequisites:
     - WP-CLI  (https://wp-cli.org)
@@ -484,12 +535,16 @@ USAGE
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 main() {
-  [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage
+  case "${1:-}" in
+    --help|-h)   usage ;;
+    update-cli)  update_cli ;;
+  esac
 
   banner
   check_requirements
   setup_core
   setup_themes
+  setup_deploy
   setup_plugins
   setup_config
   setup_build

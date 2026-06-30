@@ -30,7 +30,15 @@ curl -fsSL https://raw.githubusercontent.com/thisisgain/Mimir/main/install.sh | 
 
 This downloads `setup.sh` to `/usr/local/bin/mimir` and prompts for your password (sudo required to write there). You only need to do this once per machine.
 
-To update to the latest version, run the same command again.
+### Updating
+
+To pull in the latest changes to Mimir:
+
+```bash
+mimir update-cli
+```
+
+This re-downloads `setup.sh` from GitHub and reinstalls it — equivalent to running the curl command above again.
 
 ---
 
@@ -62,10 +70,11 @@ The interactive wizard walks through the following steps in order:
 3. **Site configuration** — URL, title, admin credentials
 4. **WordPress core** — downloads core (`en_GB`), generates `wp-config.php`, creates the database, runs the install
 5. **Theme setup** — clones Erebus as the parent theme, scaffolds a child theme with the correct `Template:` header
-6. **Git initialisation** — writes a `.gitignore`, makes the initial commit on `main`, optionally sets a remote and pushes
-7. *(Placeholder)* Plugin installation
-8. *(Placeholder)* Optional WP settings configuration
-9. *(Placeholder)* Front-end build dependency installation
+6. **Deploy workflow** — copies `deploy.yml` from the Mimir repo into `.github/workflows/`
+7. **Git initialisation** — writes a `.gitignore`, makes the initial commit on `main`, optionally sets a remote and pushes
+8. *(Placeholder)* Plugin installation
+9. *(Placeholder)* Optional WP settings configuration
+10. *(Placeholder)* Front-end build dependency installation
 
 ---
 
