@@ -30,7 +30,27 @@ curl -fsSL https://raw.githubusercontent.com/thisisgain/Mimir/main/install.sh | 
 
 This downloads `setup.sh` to `/usr/local/bin/mimir` and prompts for your password (sudo required to write there). You only need to do this once per machine.
 
-To update to the latest version, run the same command again.
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thisisgain/Mimir/main/install.sh | bash -s -- --version=4.0.0
+```
+
+### Updating
+
+To pull in the latest release:
+
+```bash
+mimir update-cli
+```
+
+To update to a specific version:
+
+```bash
+mimir update-cli --version=4.1.0
+```
+
+Both commands fetch `setup.sh` from the corresponding [GitHub release tag](https://github.com/thisisgain/Mimir/releases) and reinstall it to `/usr/local/bin/mimir`.
 
 ---
 
@@ -41,6 +61,12 @@ From an **empty directory** that will become your project root:
 ```bash
 mkdir my-project && cd my-project
 mimir
+```
+
+To check the currently installed version:
+
+```bash
+mimir version
 ```
 
 ### Local development (without global install)
@@ -62,10 +88,11 @@ The interactive wizard walks through the following steps in order:
 3. **Site configuration** — URL, title, admin credentials
 4. **WordPress core** — downloads core (`en_GB`), generates `wp-config.php`, creates the database, runs the install
 5. **Theme setup** — clones Erebus as the parent theme, scaffolds a child theme with the correct `Template:` header
-6. **Git initialisation** — writes a `.gitignore`, makes the initial commit on `main`, optionally sets a remote and pushes
-7. *(Placeholder)* Plugin installation
-8. *(Placeholder)* Optional WP settings configuration
-9. *(Placeholder)* Front-end build dependency installation
+6. **Deploy workflow** — copies `deploy.yml` from the Mimir repo into `.github/workflows/`
+7. **Git initialisation** — writes a `.gitignore`, makes the initial commit on `main`, optionally sets a remote and pushes
+8. *(Placeholder)* Plugin installation
+9. *(Placeholder)* Optional WP settings configuration
+10. *(Placeholder)* Front-end build dependency installation
 
 ---
 
@@ -99,7 +126,7 @@ The following are planned additions. Each has a placeholder stub in `setup.sh` m
 
 - [ ] **Settings configuration** — `setup_config()` is a stub. Implement optional WordPress settings (permalink structure, timezone, default post/comment settings, etc.) using `wp option update`.
 
-- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `npm install` (and an optional initial build run) in both the parent and child theme directories.
+- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `yarn install` (and an optional initial build run) in both the parent and child theme directories.
 
 ---
 

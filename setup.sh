@@ -12,6 +12,9 @@ trap 'echo -e "\n  \033[0;31m\033[1m✗ Setup failed on line ${LINENO}. See outp
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
+readonly MIMIR_VERSION="4.1.0"
+readonly MIMIR_REPO="thisisgain/Mimir"
+
 readonly EREBUS_REPO="git@github.com:thisisgain/Erebus.git"
 readonly EREBUS_THEME_DIR="wp-content/themes/erebus"
 readonly DEFAULT_ADMIN_EMAIL="harry.finn@thisisgain.com"
@@ -339,7 +342,33 @@ PHP
   fi
 }
 
-# ─── Step 4: Plugins (placeholder) ───────────────────────────────────────────
+# ─── Step 4: GitHub Actions deploy workflow ──────────────────────────────────
+
+setup_deploy() {
+  step "GitHub Actions deploy workflow"
+
+  local workflows_dir=".github/workflows"
+  local deploy_dest="${workflows_dir}/deploy.yml"
+  local deploy_src="https://raw.githubusercontent.com/thisisgain/Mimir/main/deploy.yml"
+
+  if [[ -f "$deploy_dest" ]]; then
+    success "Deploy workflow already exists, skipping"
+    return
+  fi
+
+  mkdir -p "$workflows_dir"
+  curl -fsSL "$deploy_src" -o "$deploy_dest" \
+    || error "Failed to download deploy workflow from ${deploy_src}"
+
+  success "Deploy workflow written to ${deploy_dest}"
+  info "Configure the following in your GitHub repo settings before pushing:"
+  echo "" >&2
+  echo -e "    ${BOLD}Variables:${RESET}  THEME_DIR, WPE_ENV, NODE_VERSION, PHP_VERSION" >&2
+  echo -e "    ${BOLD}Secret:${RESET}     WPE_SSHG_KEY_PRIVATE" >&2
+  echo "" >&2
+}
+
+# ─── Step 5: Plugins (placeholder) ───────────────────────────────────────────
 
 setup_plugins() {
   # TODO: Install default plugin set.
@@ -349,7 +378,7 @@ setup_plugins() {
   :
 }
 
-# ─── Step 5: Optional config (placeholder) ───────────────────────────────────
+# ─── Step 6: Optional config (placeholder) ───────────────────────────────────
 
 setup_config() {
   # TODO: Apply optional WordPress settings (permalink structure, timezone,
@@ -358,7 +387,7 @@ setup_config() {
   :
 }
 
-# ─── Step 6: Build dependencies (placeholder) ────────────────────────────────
+# ─── Step 7: Build dependencies (placeholder) ────────────────────────────────
 
 setup_build() {
   # TODO: Install front-end build dependencies once build tooling in Erebus
@@ -367,7 +396,7 @@ setup_build() {
   :
 }
 
-# ─── Step 7: Git initialisation ──────────────────────────────────────────────
+# ─── Step 8: Git initialisation ──────────────────────────────────────────────
 
 setup_git() {
   step "Git repository setup"
@@ -458,16 +487,89 @@ print_summary() {
   echo ""
 }
 
+# ─── Version helpers ─────────────────────────────────────────────────────────
+
+# Normalise a version string to vX.Y.Z — strips a leading 'v' then re-adds it.
+normalise_version() {
+  local v="${1#v}"
+  echo "v${v}"
+}
+
+# Fetch the latest release tag from GitHub.
+latest_release_tag() {
+  local tag
+  tag=$(curl -fsSL "https://api.github.com/repos/${MIMIR_REPO}/releases/latest" \
+    | grep '"tag_name"' \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/') \
+    || error "Could not reach GitHub — check your internet connection."
+  [[ -z "$tag" ]] && error "Could not determine the latest Mimir release."
+  echo "$tag"
+}
+
+# ─── Update CLI ──────────────────────────────────────────────────────────────
+
+update_cli() {
+  local install_path="/usr/local/bin/mimir"
+  local version_input=""
+
+  # Parse --version=X.Y.Z or --version X.Y.Z
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --version=*) version_input="${1#--version=}"; shift ;;
+      --version)   version_input="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  echo ""
+  echo -e "${BLUE}${BOLD}  Updating Mimir CLI...${RESET}" >&2
+  echo ""
+
+  local version_tag
+  if [[ -n "$version_input" ]]; then
+    version_tag=$(normalise_version "$version_input")
+    info "Installing Mimir ${version_tag}..."
+  else
+    info "Fetching latest Mimir release..."
+    version_tag=$(latest_release_tag)
+    info "Latest release: ${version_tag}"
+  fi
+
+  local script_url="https://raw.githubusercontent.com/${MIMIR_REPO}/${version_tag}/setup.sh"
+  local tmp
+  tmp=$(mktemp)
+  info "Downloading ${script_url}..."
+  curl -fsSL "$script_url" -o "$tmp" \
+    || error "Failed to download Mimir ${version_tag}. Check the version exists: https://github.com/${MIMIR_REPO}/releases"
+  chmod +x "$tmp"
+  info "Installing to ${install_path} (may prompt for your password)..."
+  sudo mv "$tmp" "$install_path"
+  sudo chmod +x "$install_path"
+  success "Mimir updated to ${version_tag}"
+  echo ""
+  exit 0
+}
+
+# ─── Version ─────────────────────────────────────────────────────────────────
+
+cmd_version() {
+  echo "  Mimir v${MIMIR_VERSION}"
+  exit 0
+}
+
 # ─── Usage ───────────────────────────────────────────────────────────────────
 
 usage() {
   cat << USAGE
 
-  Mimir v4 — GAIN WordPress Project Setup
+  Mimir v${MIMIR_VERSION} — GAIN WordPress Project Setup
 
   Usage:
-    ./setup.sh          Run the interactive setup wizard
-    ./setup.sh --help   Show this help text
+    mimir                              Run the interactive setup wizard
+    mimir version                      Print the installed Mimir version
+    mimir update-cli                   Update to the latest release
+    mimir update-cli --version=4.1.0   Update to a specific version
+    mimir --help                       Show this help text
 
   Prerequisites:
     - WP-CLI  (https://wp-cli.org)
@@ -484,12 +586,17 @@ USAGE
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 main() {
-  [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage
+  case "${1:-}" in
+    --help|-h)   usage ;;
+    version)     cmd_version ;;
+    update-cli)  update_cli "${@:2}" ;;
+  esac
 
   banner
   check_requirements
   setup_core
   setup_themes
+  setup_deploy
   setup_plugins
   setup_config
   setup_build
