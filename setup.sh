@@ -12,11 +12,12 @@ trap 'echo -e "\n  \033[0;31m\033[1m✗ Setup failed on line ${LINENO}. See outp
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-readonly MIMIR_VERSION="4.1.0"
+readonly MIMIR_VERSION="4.2.0"
 readonly MIMIR_REPO="thisisgain/Mimir"
 
 readonly EREBUS_REPO="git@github.com:thisisgain/Erebus.git"
 readonly EREBUS_THEME_DIR="wp-content/themes/erebus"
+readonly EREBUS_VERSION="3.0.0"
 readonly DEFAULT_ADMIN_EMAIL="harry.finn@thisisgain.com"
 readonly DEFAULT_ADMIN_USER="super.user"
 readonly DEFAULT_DB_HOST="127.0.0.1"
@@ -246,99 +247,34 @@ setup_core() {
 
 # ─── Step 3: Theme setup ─────────────────────────────────────────────────────
 
-CHILD_THEME_SLUG=""
+# Set by --theme-version flag; falls back to EREBUS_VERSION constant.
+THEME_VERSION_OVERRIDE=""
 
 setup_themes() {
   step "Theme setup"
 
-  CHILD_THEME_SLUG=$(ask_validated \
-    "Child theme slug (lowercase letters, numbers and hyphens)" \
-    "" \
-    "^[a-z0-9-]+$" \
-    "Use lowercase letters, numbers and hyphens only.")
+  local erebus_tag
+  if [[ -n "$THEME_VERSION_OVERRIDE" ]]; then
+    erebus_tag=$(normalise_version "$THEME_VERSION_OVERRIDE")
+  else
+    erebus_tag="v${EREBUS_VERSION}"
+  fi
 
-  local child_display
-  # Title-case the slug by default
-  child_display=$(echo "$CHILD_THEME_SLUG" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')
-  child_display=$(ask "Theme display name" "$child_display")
-
-  local child_author
-  child_author=$(ask "Theme author" "GAIN")
-
-  # Clone Erebus parent
   if [[ -d "$EREBUS_THEME_DIR" ]]; then
-    success "Erebus parent theme already present, skipping clone"
+    success "Erebus already present at ${EREBUS_THEME_DIR}, skipping clone"
   else
-    info "Cloning Erebus parent theme from ${EREBUS_REPO}..."
-    git clone "$EREBUS_REPO" "$EREBUS_THEME_DIR"
+    info "Cloning Erebus ${erebus_tag}..."
+    git clone --branch "$erebus_tag" --depth 1 "$EREBUS_REPO" "$EREBUS_THEME_DIR" \
+      || error "Could not clone Erebus ${erebus_tag}. Check the tag exists: https://github.com/thisisgain/Erebus/releases"
     rm -rf "${EREBUS_THEME_DIR}/.git"
-    success "Erebus cloned to ${EREBUS_THEME_DIR}"
+    success "Erebus ${erebus_tag} cloned to ${EREBUS_THEME_DIR}"
   fi
 
-  # Generate child theme scaffold
-  local child_dir="wp-content/themes/${CHILD_THEME_SLUG}"
-  if [[ -d "$child_dir" ]]; then
-    success "Child theme '${CHILD_THEME_SLUG}' already exists, skipping scaffold"
+  if wp theme is-active erebus &>/dev/null; then
+    success "Erebus already active, skipping"
   else
-  mkdir -p "$child_dir"
-
-  # style.css — WordPress reads theme metadata from here
-  cat > "${child_dir}/style.css" << CSS
-/*
-Theme Name:   ${child_display}
-Theme URI:    https://thisisgain.com
-Author:       ${child_author}
-Description:  ${child_display} — child theme built on Erebus
-Template:     erebus
-Version:      1.0.0
-Text Domain:  ${CHILD_THEME_SLUG}
-*/
-
-/*
- * TODO: Update child theme approach once finalised in Erebus.
- * Add project-specific overrides here; avoid duplicating parent styles.
- */
-CSS
-
-  # functions.php — enqueue parent styles, placeholder for further setup
-  cat > "${child_dir}/functions.php" << 'PHP'
-<?php
-
-/**
- * Enqueue parent and child theme stylesheets.
- *
- * TODO: Update once the Erebus build process is confirmed. If the parent
- * theme compiles its own CSS, enqueue that compiled asset rather than
- * the raw style.css below.
- */
-add_action( 'wp_enqueue_scripts', function () {
-    wp_enqueue_style(
-        'erebus-style',
-        get_template_directory_uri() . '/style.css',
-        [],
-        wp_get_theme( 'erebus' )->get( 'Version' )
-    );
-
-    wp_enqueue_style(
-        'erebus-child-style',
-        get_stylesheet_uri(),
-        [ 'erebus-style' ],
-        wp_get_theme()->get( 'Version' )
-    );
-} );
-PHP
-
-  # index.php — required by WordPress theme standards
-  echo "<?php // Silence is golden." > "${child_dir}/index.php"
-
-  success "Child theme scaffold created at ${child_dir}"
-  fi
-
-  if wp theme is-active "$CHILD_THEME_SLUG" &>/dev/null; then
-    success "Child theme '${CHILD_THEME_SLUG}' already active, skipping"
-  else
-    wp theme activate "$CHILD_THEME_SLUG"
-    success "Child theme '${CHILD_THEME_SLUG}' activated"
+    wp theme activate erebus
+    success "Erebus theme activated"
   fi
 }
 
@@ -480,7 +416,7 @@ print_summary() {
   echo -e "  ${BOLD}WP Admin:${RESET}        ${SITE_URL}/wp-admin"
   echo -e "  ${BOLD}Admin user:${RESET}      ${ADMIN_USER}"
   echo -e "  ${BOLD}Admin password:${RESET}  ${ADMIN_PASSWORD}"
-  echo -e "  ${BOLD}Child theme:${RESET}     ${CHILD_THEME_SLUG}"
+  echo -e "  ${BOLD}Theme:${RESET}           Erebus v${THEME_VERSION_OVERRIDE:-$EREBUS_VERSION}"
   echo ""
   echo -e "  ${YELLOW}Note: wp-config.php is excluded from git. Add it manually${RESET}"
   echo -e "  ${YELLOW}per environment (e.g. via WP Engine SSH access).${RESET}"
@@ -565,11 +501,14 @@ usage() {
   Mimir v${MIMIR_VERSION} — GAIN WordPress Project Setup
 
   Usage:
-    mimir                              Run the interactive setup wizard
-    mimir version                      Print the installed Mimir version
-    mimir update-cli                   Update to the latest release
-    mimir update-cli --version=4.1.0   Update to a specific version
-    mimir --help                       Show this help text
+    mimir                                Run the interactive setup wizard
+    mimir --theme-version=3.1.0          Use a specific Erebus version
+    mimir version                        Print the installed Mimir version
+    mimir update-cli                     Update to the latest Mimir release
+    mimir update-cli --version=4.2.0     Update to a specific Mimir version
+    mimir --help                         Show this help text
+
+  Default Erebus version: ${EREBUS_VERSION}
 
   Prerequisites:
     - WP-CLI  (https://wp-cli.org)
@@ -591,6 +530,15 @@ main() {
     version)     cmd_version ;;
     update-cli)  update_cli "${@:2}" ;;
   esac
+
+  # Parse setup flags
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --theme-version=*) THEME_VERSION_OVERRIDE="${1#--theme-version=}"; shift ;;
+      --theme-version)   THEME_VERSION_OVERRIDE="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
 
   banner
   check_requirements

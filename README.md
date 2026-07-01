@@ -63,7 +63,13 @@ mkdir my-project && cd my-project
 mimir
 ```
 
-To check the currently installed version:
+To use a specific Erebus version:
+
+```bash
+mimir --theme-version=3.1.0
+```
+
+To check the currently installed Mimir version:
 
 ```bash
 mimir version
@@ -87,7 +93,7 @@ The interactive wizard walks through the following steps in order:
 2. **Database configuration** — DB name, user, password, and host
 3. **Site configuration** — URL, title, admin credentials
 4. **WordPress core** — downloads core (`en_GB`), generates `wp-config.php`, creates the database, runs the install
-5. **Theme setup** — clones Erebus as the parent theme, scaffolds a child theme with the correct `Template:` header
+5. **Theme setup** — clones the tagged Erebus release into `wp-content/themes/erebus` and activates it
 6. **Deploy workflow** — copies `deploy.yml` from the Mimir repo into `.github/workflows/`
 7. **Git initialisation** — writes a `.gitignore`, makes the initial commit on `main`, optionally sets a remote and pushes
 8. *(Placeholder)* Plugin installation
@@ -120,13 +126,11 @@ cd wp-content/themes/erebus
 
 The following are planned additions. Each has a placeholder stub in `setup.sh` marked with a `TODO` comment.
 
-- [ ] **Child theme scaffold** — `setup_themes()` generates placeholder `style.css`, `functions.php`, and `index.php` files. These need updating once the Erebus child theme approach is finalised (asset enqueuing, namespace setup, any required config files).
-
 - [ ] **Plugin installation** — `setup_plugins()` is a stub. Implement a default plugin set installed and activated via `wp plugin install <slug> --activate`. Consider either a hardcoded list or a `plugins.json` config file for flexibility.
 
 - [ ] **Settings configuration** — `setup_config()` is a stub. Implement optional WordPress settings (permalink structure, timezone, default post/comment settings, etc.) using `wp option update`.
 
-- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `yarn install` (and an optional initial build run) in both the parent and child theme directories.
+- [ ] **Build dependencies** — `setup_build()` is a stub. Once the Erebus build tooling is confirmed, implement `yarn install` (and an optional initial build run) in the theme directory.
 
 ---
 
